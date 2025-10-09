@@ -3,58 +3,58 @@ import json
 from pydantic import BaseModel, ValidationError
 from datetime import datetime
 
-# Pydantic model for event validation
+# event validation
 class Event(BaseModel):
     event_type: str
     product_id: str
     user_id: str
 
-# Kafka Configuration
+# Kafka
+KAFKA_URL = 'localhost:9092'
 consumer = KafkaConsumer(
     'raw-events',
-    bootstrap_servers=['localhost:9092'],
+    bootstrap_servers=[KAFKA_URL],
     value_deserializer=lambda v: json.loads(v.decode('utf-8')),
-    auto_offset_reset='earliest' # Start reading from the beginning of the topic
+    auto_offset_reset='earliest'
 )
 
 producer = KafkaProducer(
-    bootstrap_servers=['localhost:9092'],
+    bootstrap_servers=[KAFKA_URL],
     value_serializer=lambda v: json.dumps(v).encode('utf-8')
 )
 
-print("Data processor started...")
+print("starting processor")
 
 for message in consumer:
-    event_data = message.value
-    print(f"Received event: {event_data}")
+    event = message.value
+    print(f"got event: {event}")
 
     try:
-        # 1. Validate event data
-        Event(**event_data)
+        Event(**event)
         
-        # 2. Enrich event data
-        event_data['processed_at'] = datetime.utcnow().isoformat()
-        event_data['status'] = 'processed'
+        # Enrich
+        event['processed_at'] = datetime.utcnow().isoformat()
+        event['status'] = 'processed'
         
-        # 3. Send to processed-events topic
-        producer.send('processed-events', event_data)
-        print(f"Processed and sent event: {event_data}")
+        # Send
+        producer.send('processed-events', event)
+        print(f"Processed: {event}")
 
     except ValidationError as e:
-        # 4. Handle invalid data
-        error_payload = {
+        # invalid data
+        err_payload = {
             "error": "validation_failed",
             "details": e.errors(),
-            "original_event": event_data
+            "original_event": event
         }
-        producer.send('dead-letter-queue', error_payload)
-        print(f"Validation failed. Sent to dead-letter-queue: {error_payload}")
+        producer.send('dead-letter-queue', err_payload)
+        print(f"Validation failed: {err_payload}")
     except Exception as e:
-        # Handle other potential errors
-        error_payload = {
+        # other errors
+        err_payload = {
             "error": "processing_failed",
             "details": str(e),
-            "original_event": event_data
+            "original_event": event
         }
-        producer.send('dead-letter-queue', error_payload)
-        print(f"Processing failed. Sent to dead-letter-queue: {error_payload}")
+        producer.send('dead-letter-queue', err_payload)
+        print(f"Processing failed: {err_payload}")
