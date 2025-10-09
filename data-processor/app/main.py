@@ -11,21 +11,21 @@ def run():
 
     for message in consumer:
         event_data = message.value
-        print(f"Received event: {event_data}")
+        print("Received event: {}".format(event_data))
 
         try:
-            # 1. Validate event data
+            # validate
             Event(**event_data)
             
-            # 2. Process and enrich event data
+            # process
             processed_data = process_event(event_data)
             
-            # 3. Send to processed-events topic
+            # send to processed topic
             producer.send(PROCESSED_EVENTS_TOPIC, processed_data)
             print(f"Processed and sent event: {processed_data}")
 
         except ValidationError as e:
-            # 4. Handle invalid data
+            # handle invalid data
             error_payload = {
                 "error": "validation_failed",
                 "details": e.errors(),
@@ -34,7 +34,7 @@ def run():
             producer.send(DEAD_LETTER_TOPIC, error_payload)
             print(f"Validation failed. Sent to dead-letter-queue: {error_payload}")
         except Exception as e:
-            # Handle other potential errors
+            # Handle other errors
             error_payload = {
                 "error": "processing_failed",
                 "details": str(e),
