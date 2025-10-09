@@ -52,9 +52,11 @@ for message in consumer:
     except Exception as e:
         # other errors
         err_payload = {
-            "error": "processing_failed",
+            "error": "processing_failed", # error msg
             "details": str(e),
             "original_event": event
         }
         producer.send('dead-letter-queue', err_payload)
         print(f"Processing failed: {err_payload}")
+
+# todo: handle graceful shutdown
